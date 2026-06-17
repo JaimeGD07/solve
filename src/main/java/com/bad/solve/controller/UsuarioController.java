@@ -2,53 +2,72 @@ package com.bad.solve.controller;
 
 import com.bad.solve.entity.Usuario;
 import com.bad.solve.service.UsuarioService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/usuarios")
-@CrossOrigin(origins = "http://localhost:4200")
 public class UsuarioController {
+    private final UsuarioService service;
 
-    private final UsuarioService usuarioService;
-
-    public UsuarioController(UsuarioService usuarioService) {
-        this.usuarioService = usuarioService;
+    public UsuarioController(UsuarioService service) {
+        this.service = service;
     }
 
+    /**
+     * Lista todos los usuarios del sistema
+     * 
+     * @return Lista de todos los usuarios
+     */
     @GetMapping
     public List<Usuario> listar() {
-        return usuarioService.listarUsuarios();
+        return service.listar();
     }
 
+    /**
+     * Obtiene un usuario específico por su ID
+     * 
+     * @param id - Código del usuario a obtener
+     * @return Usuario solicitado
+     */
     @GetMapping("/{id}")
-    public Usuario buscarPorId(@PathVariable Long id) {
-        return usuarioService.buscarPorId(id);
+    public Usuario obtener(@PathVariable Long id) {
+        return service.obtener(id);
     }
 
-    @GetMapping("/email/{email}")
-    public Usuario buscarPorEmail(@PathVariable String email) {
-        return usuarioService.buscarPorEmail(email);
-    }
-
+    /**
+     * Crea un nuevo usuario
+     * 
+     * @param usuario - Objeto con los datos del usuario
+     * @return Usuario creado con ID asignado
+     */
     @PostMapping
-    public Usuario guardar(@RequestBody Usuario usuario) {
-        return usuarioService.guardarUsuario(usuario);
+    public Usuario crear(@RequestBody Usuario usuario) {
+        return service.crear(usuario);
     }
 
+    /**
+     * Actualiza un usuario existente
+     * 
+     * @param id - Código del usuario a actualizar
+     * @param usuario - Objeto con los nuevos datos
+     * @return Usuario actualizado
+     */
     @PutMapping("/{id}")
     public Usuario actualizar(@PathVariable Long id, @RequestBody Usuario usuario) {
-        return usuarioService.actualizarUsuario(id, usuario);
+        return service.actualizar(id, usuario);
     }
 
+    /**
+     * Elimina un usuario del sistema
+     * 
+     * @param id - Código del usuario a eliminar
+     * @return Respuesta vacía (204 No Content)
+     */
     @DeleteMapping("/{id}")
-    public void eliminar(@PathVariable Long id) {
-        usuarioService.eliminarUsuario(id);
-    }
-
-    @PutMapping("/{id}/desactivar")
-    public Usuario desactivar(@PathVariable Long id) {
-        return usuarioService.desactivarUsuario(id);
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        service.eliminar(id);
+        return ResponseEntity.noContent().build();
     }
 }

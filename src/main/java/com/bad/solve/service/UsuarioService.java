@@ -2,7 +2,9 @@ package com.bad.solve.service;
 
 import com.bad.solve.entity.Usuario;
 import com.bad.solve.repository.UsuarioRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -15,40 +17,27 @@ public class UsuarioService {
         this.usuarioRepository = usuarioRepository;
     }
 
-    public List<Usuario> listarUsuarios() {
+    public List<Usuario> listar() {
         return usuarioRepository.findAll();
     }
 
-    public Usuario buscarPorId(Long id) {
+    public Usuario obtener(Long id) {
         return usuarioRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado: " + id));
     }
 
-    public Usuario buscarPorEmail(String email) {
-        return usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con email: " + email));
-    }
-
-    public Usuario guardarUsuario(Usuario usuario) {
-
-        if (usuarioRepository.existsByEmail(usuario.getEmail())) {
-            throw new RuntimeException("Ya existe un usuario con ese correo");
-        }
-
-        if (usuario.getIntentos() == null) {
+    @Transactional
+    public Usuario crear(Usuario usuario) {
+        if (usuario.getIntentos() == null)
             usuario.setIntentos(0);
-        }
-
-        if (usuario.getEstado() == null) {
-            usuario.setEstado(1);
-        }
-
+        if (usuario.getEstado() == null || usuario.getEstado().isBlank())
+            usuario.setEstado("ACTIVO");
         return usuarioRepository.save(usuario);
     }
 
-    public Usuario actualizarUsuario(Long id, Usuario datos) {
-        Usuario usuario = buscarPorId(id);
-
+    @Transactional
+    public Usuario actualizar(Long id, Usuario datos) {
+        Usuario usuario = obtener(id);
         usuario.setPrimNom(datos.getPrimNom());
         usuario.setSegNom(datos.getSegNom());
         usuario.setPrimApell(datos.getPrimApell());
@@ -57,21 +46,16 @@ public class UsuarioService {
         usuario.setPais(datos.getPais());
         usuario.setCiudad(datos.getCiudad());
         usuario.setEmail(datos.getEmail());
-        usuario.setPassHash(datos.getPassHash());
-        usuario.setIntentos(datos.getIntentos());
-        usuario.setEstado(datos.getEstado());
-
+        usuario.setIntentos(datos.getIntentos() == null ? usuario.getIntentos() : datos.getIntentos());
+        usuario.setEstado(datos.getEstado() == null ? usuario.getEstado() : datos.getEstado());
+        if (datos.getPassHash() != null && !datos.getPassHash().isBlank()) {
+            usuario.setPassHash(datos.getPassHash());
+        }
         return usuarioRepository.save(usuario);
     }
 
-    public void eliminarUsuario(Long id) {
-        Usuario usuario = buscarPorId(id);
-        usuarioRepository.delete(usuario);
-    }
-
-    public Usuario desactivarUsuario(Long id) {
-        Usuario usuario = buscarPorId(id);
-        usuario.setEstado(0);
-        return usuarioRepository.save(usuario);
+    @Transactional
+    public void eliminar(Long id) {
+        usuarioRepository.delete(obtener(id));
     }
 }

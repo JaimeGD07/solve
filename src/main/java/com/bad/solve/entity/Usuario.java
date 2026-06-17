@@ -1,5 +1,6 @@
 package com.bad.solve.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -36,17 +37,15 @@ public class Usuario {
     @Column(name = "EMAIL", length = 254, nullable = false, unique = true)
     private String email;
 
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(name = "PASS_HASH", length = 255, nullable = false)
     private String passHash;
 
     @Column(name = "INTENTOS", nullable = false)
-    private Integer intentos;
+    private Integer intentos = 0;
 
-    @Column(name = "ESTADO", nullable = false)
-    private Integer estado;
-
-    public Usuario() {
-    }
+    @Column(name = "ESTADO", length = 20, nullable = false)
+    private String estado = "ACTIVO";
 
     public Long getCodUsu() {
         return codUsu;
@@ -119,7 +118,7 @@ public class Usuario {
     public void setEmail(String email) {
         this.email = email;
     }
-    
+
     public String getPassHash() {
         return passHash;
     }
@@ -136,11 +135,11 @@ public class Usuario {
         this.intentos = intentos;
     }
 
-    public Integer getEstado() {
+    public String getEstado() {
         return estado;
     }
 
-    public void setEstado(Integer estado) {
+    public void setEstado(String estado) {
         this.estado = estado;
     }
 }

@@ -13,7 +13,7 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/**").permitAll()
+                .requestMatchers("/api/**").permitAll()     // Permitir acceso a las rutas de la API sin autenticación
                 .anyRequest().permitAll()
             )
             .formLogin(form -> form.disable())
