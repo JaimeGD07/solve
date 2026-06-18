@@ -4,13 +4,28 @@ import com.bad.solve.entity.RespuestaEncuesta;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import java.util.List;
 
 public interface RespuestaEncuestaRepository extends JpaRepository<RespuestaEncuesta, Long> {
-    List<RespuestaEncuesta> findByUsuarioCodUsu(Long codUsu);
 
-    List<RespuestaEncuesta> findByEncuestaCodEnc(Long codEnc);
+    @Query(value = """
+        SELECT NVL(MAX(INTENTO), 0)
+        FROM RESPUESTA_ENCUESTA
+        WHERE COD_USU = :codUsu
+          AND COD_ENC = :codEnc
+        """, nativeQuery = true)
+    Integer obtenerUltimoIntento(
+            @Param("codUsu") Long codUsu,
+            @Param("codEnc") Long codEnc
+    );
 
-    @Query("select coalesce(max(r.intento), 0) from RespuestaEncuesta r where r.encuesta.codEnc = :codEnc and r.usuario.codUsu = :codUsu")
-    Integer obtenerUltimoIntento(@Param("codEnc") Long codEnc, @Param("codUsu") Long codUsu);
+    @Query(value = """
+        SELECT NVL(MAX(INTENTO), 0) + 1
+        FROM RESPUESTA_ENCUESTA
+        WHERE COD_USU = :codUsu
+          AND COD_ENC = :codEnc
+        """, nativeQuery = true)
+    Integer obtenerSiguienteIntento(
+            @Param("codUsu") Long codUsu,
+            @Param("codEnc") Long codEnc
+    );
 }

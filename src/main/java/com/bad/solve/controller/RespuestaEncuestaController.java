@@ -1,54 +1,66 @@
 package com.bad.solve.controller;
 
-import com.bad.solve.dto.RespuestaEncuestaRequest;
+import com.bad.solve.dto.ResponderEncuestaRequest;
 import com.bad.solve.entity.RespuestaEncuesta;
 import com.bad.solve.service.RespuestaEncuestaService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/respuestas-encuesta")
+@CrossOrigin(origins = "http://localhost:4200")
 public class RespuestaEncuestaController {
-    private final RespuestaEncuestaService service;
 
-    public RespuestaEncuestaController(RespuestaEncuestaService service) {
-        this.service = service;
+    private final RespuestaEncuestaService respuestaEncuestaService;
+
+    public RespuestaEncuestaController(RespuestaEncuestaService respuestaEncuestaService) {
+        this.respuestaEncuestaService = respuestaEncuestaService;
     }
 
     @GetMapping
-    public List<RespuestaEncuesta> listar(@RequestParam(required = false) Long codUsu,
-            @RequestParam(required = false) Long codEnc) {
-        if (codUsu != null)
-            return service.listarPorUsuario(codUsu);
-        if (codEnc != null)
-            return service.listarPorEncuesta(codEnc);
-        return service.listar();
+    public ResponseEntity<List<RespuestaEncuesta>> listar() {
+        return ResponseEntity.ok(respuestaEncuestaService.listar());
     }
 
     @GetMapping("/{id}")
-    public RespuestaEncuesta obtener(@PathVariable Long id) {
-        return service.obtener(id);
+    public ResponseEntity<RespuestaEncuesta> buscarPorId(@PathVariable Long id) {
+        return ResponseEntity.ok(respuestaEncuestaService.buscarPorId(id));
     }
 
-    @PostMapping("/iniciar")
-    public RespuestaEncuesta iniciar(@RequestBody RespuestaEncuestaRequest request) {
-        return service.iniciar(request);
+    @PostMapping
+    public ResponseEntity<RespuestaEncuesta> guardar(@RequestBody RespuestaEncuesta respuestaEncuesta) {
+        return ResponseEntity.ok(respuestaEncuestaService.guardar(respuestaEncuesta));
     }
 
-    @PutMapping("/{id}/finalizar")
-    public RespuestaEncuesta finalizar(@PathVariable Long id) {
-        return service.finalizar(id);
-    }
-
-    @PutMapping("/{id}/anular")
-    public RespuestaEncuesta anular(@PathVariable Long id) {
-        return service.anular(id);
+    @PutMapping("/{id}")
+    public ResponseEntity<RespuestaEncuesta> actualizar(
+            @PathVariable Long id,
+            @RequestBody RespuestaEncuesta respuestaEncuesta
+    ) {
+        return ResponseEntity.ok(respuestaEncuestaService.actualizar(id, respuestaEncuesta));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        service.eliminar(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<Map<String, String>> eliminar(@PathVariable Long id) {
+        respuestaEncuestaService.eliminar(id);
+
+        return ResponseEntity.ok(Map.of(
+                "mensaje", "Respuesta de encuesta eliminada correctamente"
+        ));
+    }
+
+    @PostMapping("/responder")
+    public ResponseEntity<Map<String, Object>> responderEncuesta(
+            @RequestBody ResponderEncuestaRequest request
+    ) {
+        Long codRespEnc = respuestaEncuestaService.responderEncuesta(request);
+
+        return ResponseEntity.ok(Map.of(
+                "mensaje", "Encuesta respondida correctamente",
+                "codRespEnc", codRespEnc
+        ));
     }
 }
