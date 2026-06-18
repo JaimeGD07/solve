@@ -126,6 +126,12 @@
     <version>0.13.0</version>
     <scope>runtime</scope>
 </dependency>
+
+				<!-- Dependencias para el envío de correos -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-mail</artifactId>
+</dependency>
 	</dependencies>
 
 	<build>

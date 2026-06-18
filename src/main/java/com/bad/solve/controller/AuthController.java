@@ -8,6 +8,9 @@ import com.bad.solve.dto.auth.RegistroRequest;
 import com.bad.solve.service.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.bad.solve.dto.auth.SolicitarTokenRequest;
+import com.bad.solve.dto.auth.ValidarTokenRequest;
+import com.bad.solve.dto.auth.RestablecerPasswordRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -32,15 +35,31 @@ public class AuthController {
 
     @PutMapping("/cambiar-password")
     public ResponseEntity<MensajeResponse> cambiarPassword(
-            @RequestBody CambiarPasswordRequest request
-    ) {
+            @RequestBody CambiarPasswordRequest request) {
         return ResponseEntity.ok(authService.cambiarPassword(request));
     }
 
     @GetMapping("/perfil")
     public ResponseEntity<AuthResponse> obtenerPerfil(
-            @RequestHeader("Authorization") String authHeader
-    ) {
+            @RequestHeader("Authorization") String authHeader) {
         return ResponseEntity.ok(authService.obtenerPerfil(authHeader));
+    }
+
+    @PostMapping("/recuperar-password")
+    public ResponseEntity<MensajeResponse> solicitarRecuperacionPassword(
+            @RequestBody SolicitarTokenRequest request) {
+        return ResponseEntity.ok(authService.solicitarRecuperacionPassword(request));
+    }
+
+    @PostMapping("/desbloquear")
+    public ResponseEntity<MensajeResponse> desbloquearUsuario(
+            @RequestBody ValidarTokenRequest request) {
+        return ResponseEntity.ok(authService.desbloquearUsuario(request));
+    }
+
+    @PostMapping("/restablecer-password")
+    public ResponseEntity<MensajeResponse> restablecerPassword(
+            @RequestBody RestablecerPasswordRequest request) {
+        return ResponseEntity.ok(authService.restablecerPassword(request));
     }
 }

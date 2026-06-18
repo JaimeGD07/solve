@@ -10,11 +10,19 @@ import com.bad.solve.entity.Rol;
 import com.bad.solve.entity.Usuario;
 import com.bad.solve.repository.IdentificaRepository;
 import com.bad.solve.repository.RolRepository;
+import com.bad.solve.repository.TokenRepository;
 import com.bad.solve.repository.UsuarioRepository;
 import com.bad.solve.security.JwtService;
 import jakarta.transaction.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.bad.solve.entity.Token;
+import com.bad.solve.dto.auth.SolicitarTokenRequest;
+import com.bad.solve.dto.auth.ValidarTokenRequest;
+import com.bad.solve.dto.auth.RestablecerPasswordRequest;
+
+import java.time.LocalDateTime;
+import java.security.SecureRandom;
 
 import java.util.List;
 
@@ -26,63 +34,71 @@ public class AuthService {
     private final IdentificaRepository identificaRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final TokenRepository tokenRepository;
+    private final EmailService emailService;
 
     public AuthService(
             UsuarioRepository usuarioRepository,
             RolRepository rolRepository,
             IdentificaRepository identificaRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService
-    ) {
+            JwtService jwtService,
+            TokenRepository tokenRepository,
+            EmailService emailService) {
         this.usuarioRepository = usuarioRepository;
         this.rolRepository = rolRepository;
         this.identificaRepository = identificaRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.tokenRepository = tokenRepository;
+        this.emailService = emailService;
     }
 
     public AuthResponse login(LoginRequest request) {
 
-    Usuario usuario = usuarioRepository.findByEmailIgnoreCase(request.getEmail())
-            .orElseThrow(() -> new RuntimeException("Credenciales incorrectas"));
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Credenciales incorrectas"));
 
-    if ("BLOQUEADO".equalsIgnoreCase(usuario.getEstado())) {
-        throw new RuntimeException("Usuario bloqueado por demasiados intentos fallidos");
-    }
-
-    boolean passwordCorrecta = passwordEncoder.matches(
-            request.getPassword(),
-            usuario.getPassHash()
-    );
-
-    if (!passwordCorrecta) {
-        int intentosActuales = usuario.getIntentos() == null ? 0 : usuario.getIntentos();
-        int nuevosIntentos = intentosActuales + 1;
-
-        usuario.setIntentos(nuevosIntentos);
-
-        if (nuevosIntentos >= 3) {
-            usuario.setEstado("BLOQUEADO");
+        if ("BLOQUEADO".equalsIgnoreCase(usuario.getEstado())) {
+            throw new RuntimeException("Usuario bloqueado por demasiados intentos fallidos");
         }
 
+        boolean passwordCorrecta = passwordEncoder.matches(
+                request.getPassword(),
+                usuario.getPassHash());
+
+        if (!passwordCorrecta) {
+            int intentosActuales = usuario.getIntentos() == null ? 0 : usuario.getIntentos();
+            int nuevosIntentos = intentosActuales + 1;
+
+            usuario.setIntentos(nuevosIntentos);
+
+            if (nuevosIntentos >= 3) {
+                usuario.setEstado("BLOQUEADO");
+                usuarioRepository.saveAndFlush(usuario);
+
+                generarYEnviarToken(usuario, "DESBLOQUEO");
+
+                throw new RuntimeException("Usuario bloqueado. Se envió un token al correo.");
+            }
+
+            usuarioRepository.saveAndFlush(usuario);
+
+            throw new RuntimeException("Credenciales incorrectas");
+        }
+
+        usuario.setIntentos(0);
         usuarioRepository.saveAndFlush(usuario);
 
-        throw new RuntimeException("Credenciales incorrectas");
+        List<String> roles = usuarioRepository.buscarRolesPorUsuario(usuario.getCodUsu());
+
+        String token = jwtService.generarToken(
+                usuario.getEmail(),
+                usuario.getCodUsu(),
+                roles);
+
+        return construirAuthResponse(usuario, token, roles);
     }
-
-    usuario.setIntentos(0);
-    usuarioRepository.saveAndFlush(usuario);
-
-    List<String> roles = usuarioRepository.buscarRolesPorUsuario(usuario.getCodUsu());
-
-    String token = jwtService.generarToken(
-            usuario.getEmail(),
-            usuario.getCodUsu(),
-            roles
-    );
-
-    return construirAuthResponse(usuario, token, roles);
-}
 
     @Transactional
     public MensajeResponse registrar(RegistroRequest request) {
@@ -128,8 +144,7 @@ public class AuthService {
 
         boolean passwordActualCorrecta = passwordEncoder.matches(
                 request.getPasswordActual(),
-                usuario.getPassHash()
-        );
+                usuario.getPassHash());
 
         if (!passwordActualCorrecta) {
             throw new RuntimeException("La contraseña actual es incorrecta");
@@ -161,14 +176,11 @@ public class AuthService {
     private AuthResponse construirAuthResponse(
             Usuario usuario,
             String token,
-            List<String> roles
-    ) {
-        String nombreCompleto = (
-                usuario.getPrimNom() + " " +
+            List<String> roles) {
+        String nombreCompleto = (usuario.getPrimNom() + " " +
                 (usuario.getSegNom() == null ? "" : usuario.getSegNom() + " ") +
                 usuario.getPrimApell() + " " +
-                (usuario.getSegApell() == null ? "" : usuario.getSegApell())
-        ).trim();
+                (usuario.getSegApell() == null ? "" : usuario.getSegApell())).trim();
 
         return new AuthResponse(
                 token,
@@ -177,7 +189,105 @@ public class AuthService {
                 nombreCompleto,
                 usuario.getEmail(),
                 usuario.getEstado(),
-                roles
-        );
+                roles);
+    }
+
+    private String generarCodigoToken() {
+        SecureRandom random = new SecureRandom();
+        int codigo = 100000 + random.nextInt(900000);
+        return String.valueOf(codigo);
+    }
+
+    private void generarYEnviarToken(Usuario usuario, String tipo) {
+
+        String codigo = generarCodigoToken();
+
+        Token token = new Token();
+        token.setUsuario(usuario);
+        token.setToken(codigo);
+        token.setTipo(tipo);
+        token.setFechCreacion(LocalDateTime.now());
+        token.setFechExpiracion(LocalDateTime.now().plusMinutes(15));
+        token.setUtilizado(0);
+
+        tokenRepository.save(token);
+
+        String asunto;
+        String mensaje;
+
+        if ("DESBLOQUEO".equals(tipo)) {
+            asunto = "Token para desbloquear tu usuario";
+            mensaje = "Tu usuario ha sido bloqueado.\n\n"
+                    + "Usa este código para desbloquearlo:\n\n"
+                    + codigo + "\n\n"
+                    + "Este código vence en 15 minutos.";
+        } else {
+            asunto = "Token para recuperar contraseña";
+            mensaje = "Solicitaste recuperar tu contraseña.\n\n"
+                    + "Usa este código para cambiarla:\n\n"
+                    + codigo + "\n\n"
+                    + "Este código vence en 15 minutos.";
+        }
+
+        emailService.enviarToken(usuario.getEmail(), asunto, mensaje);
+    }
+
+    public MensajeResponse solicitarRecuperacionPassword(SolicitarTokenRequest request) {
+
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        generarYEnviarToken(usuario, "RECUPERAR_PASSWORD");
+
+        return new MensajeResponse("Se envió un token al correo del usuario");
+    }
+
+    public MensajeResponse desbloquearUsuario(ValidarTokenRequest request) {
+
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        Token tokenValido = buscarTokenValido(usuario, request.getToken(), "DESBLOQUEO");
+
+        tokenValido.setUtilizado(1);
+        tokenRepository.save(tokenValido);
+
+        usuario.setIntentos(0);
+        usuario.setEstado("ACTIVO");
+        usuarioRepository.save(usuario);
+
+        return new MensajeResponse("Usuario desbloqueado correctamente");
+    }
+
+    public MensajeResponse restablecerPassword(RestablecerPasswordRequest request) {
+
+        Usuario usuario = usuarioRepository.findByEmailIgnoreCase(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        Token tokenValido = buscarTokenValido(usuario, request.getToken(), "RECUPERAR_PASSWORD");
+
+        tokenValido.setUtilizado(1);
+        tokenRepository.save(tokenValido);
+
+        usuario.setPassHash(passwordEncoder.encode(request.getNuevaPassword()));
+        usuario.setIntentos(0);
+        usuario.setEstado("ACTIVO");
+        usuarioRepository.save(usuario);
+
+        return new MensajeResponse("Contraseña actualizada correctamente");
+    }
+
+    private Token buscarTokenValido(Usuario usuario, String codigo, String tipo) {
+
+        List<Token> tokens = tokenRepository.findByUsuarioAndTipoAndUtilizado(
+                usuario,
+                tipo,
+                0);
+
+        return tokens.stream()
+                .filter(t -> t.getToken().equals(codigo))
+                .filter(t -> t.getFechExpiracion().isAfter(LocalDateTime.now()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Token inválido o expirado"));
     }
 }

@@ -1,6 +1,5 @@
 package com.bad.solve.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -15,20 +14,25 @@ public class Token {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "COD_USU", nullable = false)
-    @JsonIgnoreProperties({ "hibernateLazyInitializer", "handler" })
     private Usuario usuario;
 
-    @Column(name = "TOKEN", length = 255, nullable = false, unique = true)
+    @Column(name = "TOKEN", nullable = false, length = 255)
     private String token;
 
-    @Column(name = "FECH_CREA", nullable = false, insertable = false, updatable = false)
-    private LocalDateTime fechCrea;
+    @Column(name = "TIPO", nullable = false, length = 30)
+    private String tipo;
 
-    @Column(name = "FECH_EXP", nullable = false)
-    private LocalDateTime fechExp;
+    @Column(name = "FECH_CREACION", nullable = false)
+    private LocalDateTime fechCreacion;
+
+    @Column(name = "FECH_EXPIRACION", nullable = false)
+    private LocalDateTime fechExpiracion;
 
     @Column(name = "UTILIZADO", nullable = false)
-    private Integer utilizado = 0;
+    private Integer utilizado;
+
+    public Token() {
+    }
 
     public Long getCodToken() {
         return codToken;
@@ -54,20 +58,28 @@ public class Token {
         this.token = token;
     }
 
-    public LocalDateTime getFechCrea() {
-        return fechCrea;
+    public String getTipo() {
+        return tipo;
     }
 
-    public void setFechCrea(LocalDateTime fechCrea) {
-        this.fechCrea = fechCrea;
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
     }
 
-    public LocalDateTime getFechExp() {
-        return fechExp;
+    public LocalDateTime getFechCreacion() {
+        return fechCreacion;
     }
 
-    public void setFechExp(LocalDateTime fechExp) {
-        this.fechExp = fechExp;
+    public void setFechCreacion(LocalDateTime fechCreacion) {
+        this.fechCreacion = fechCreacion;
+    }
+
+    public LocalDateTime getFechExpiracion() {
+        return fechExpiracion;
+    }
+
+    public void setFechExpiracion(LocalDateTime fechExpiracion) {
+        this.fechExpiracion = fechExpiracion;
     }
 
     public Integer getUtilizado() {
