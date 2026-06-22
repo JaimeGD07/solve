@@ -1,76 +1,69 @@
 package com.bad.solve.controller;
 
-import com.bad.solve.dto.PreguntaRequest;
-import com.bad.solve.entity.Pregunta;
-import com.bad.solve.service.PreguntaService;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
+
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/preguntas")
+@CrossOrigin(origins = "http://localhost:4200")
 public class PreguntaController {
-    private final PreguntaService service;
 
-    public PreguntaController(PreguntaService service) {
-        this.service = service;
+    private final JdbcTemplate jdbcTemplate;
+
+    public PreguntaController(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
     }
 
-    /**
-     * Lista preguntas con opción de filtrar por encuesta
-     * 
-     * @param codEnc - (Opcional) Código de la encuesta para filtrar
-     *                 Si se omite, devuelve todas las preguntas
-     * @return Lista de preguntas
-     */
-    @GetMapping
-    public List<Pregunta> listar(@RequestParam(required = false) Long codEnc) {
-        return codEnc == null ? service.listar() : service.listarPorEncuesta(codEnc);
-    }
+    @GetMapping("/encuesta/{codEnc}")
+    public ResponseEntity<?> listarPorEncuesta(@PathVariable Long codEnc) {
+        try {
+            String sql = """
+                        SELECT
+                            p.COD_PRE,
+                            p.COD_ENC,
+                            p.PREGUNTA,
+                            p.OBLIGATORIA,
+                            p.COD_TIPO_PRE,
+                            tp.NOMBRE AS TIPO
+                        FROM PREGUNTA p
+                        LEFT JOIN TIPO_PREGUNTA tp ON tp.COD_TIPO_PRE = p.COD_TIPO_PRE
+                        WHERE p.COD_ENC = ?
+                        ORDER BY p.COD_PRE
+                    """;
 
-    /**
-     * Obtiene una pregunta específica por su ID
-     * 
-     * @param id - Código de la pregunta a obtener
-     * @return Pregunta solicitada
-     */
-    @GetMapping("/{id}")
-    public Pregunta obtener(@PathVariable Long id) {
-        return service.obtener(id);
-    }
+            List<Map<String, Object>> preguntas = jdbcTemplate.query(sql, (rs, rowNum) -> {
+                Map<String, Object> item = new LinkedHashMap<>();
 
-    /**
-     * Crea una nueva pregunta
-     * 
-     * @param request - Objeto PreguntaRequest con los datos de la pregunta
-     * @return Pregunta creada con ID asignado
-     */
-    @PostMapping
-    public Pregunta crear(@RequestBody PreguntaRequest request) {
-        return service.crear(request);
-    }
+                item.put("codPre", rs.getLong("COD_PRE"));
+                item.put("codEnc", rs.getLong("COD_ENC"));
+                item.put("enunciado", rs.getString("PREGUNTA"));
+                item.put("pregunta", rs.getString("PREGUNTA"));
+                item.put("texto", rs.getString("PREGUNTA"));
 
-    /**
-     * Actualiza una pregunta existente
-     * 
-     * @param id - Código de la pregunta a actualizar
-     * @param request - Objeto PreguntaRequest con los nuevos datos
-     * @return Pregunta actualizada
-     */
-    @PutMapping("/{id}")
-    public Pregunta actualizar(@PathVariable Long id, @RequestBody PreguntaRequest request) {
-        return service.actualizar(id, request);
-    }
+                Object obligatoria = rs.getObject("OBLIGATORIA");
+                item.put("obligatoria", obligatoria);
 
-    /**
-     * Elimina una pregunta
-     * 
-     * @param id - Código de la pregunta a eliminar
-     * @return Respuesta vacía (204 No Content)
-     */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        service.eliminar(id);
-        return ResponseEntity.noContent().build();
+                item.put("codTipoPre", rs.getLong("COD_TIPO_PRE"));
+                item.put("tipo", rs.getString("TIPO"));
+                item.put("opciones", new ArrayList<>());
+
+                return item;
+            }, codEnc);
+
+            return ResponseEntity.ok(preguntas);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("mensaje", e.getMessage());
+            error.put("endpoint", "/api/preguntas/encuesta/" + codEnc);
+
+            return ResponseEntity.status(500).body(error);
+        }
     }
+    
 }
